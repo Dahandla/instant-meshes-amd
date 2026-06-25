@@ -15,6 +15,7 @@
 #include "normal.h"
 #include <unordered_map>
 #include <fstream>
+#include <vector>
 #if !defined(_WIN32)
 #include <libgen.h>
 #endif
@@ -92,7 +93,7 @@ void load_ply(const std::string &filename, MatrixXu &F, MatrixXf &V,
     else if (!pointcloud && faceCount == 0)
         throw std::runtime_error("PLY file \"" + filename + "\" is invalid! No faces found!");
 
-    F.resize(3, faceCount);
+    F.resize(3, 0);
     V.resize(3, vertexCount);
 
     struct VertexCallbackData {
@@ -103,10 +104,11 @@ void load_ply(const std::string &filename, MatrixXu &F, MatrixXf &V,
     };
 
     struct FaceCallbackData {
-        MatrixXu &F;
+        std::vector<uint32_t> faceVerts;
+        std::vector<Vector3u> triangles;
         const ProgressCallback &progress;
-        FaceCallbackData(MatrixXu &F, const ProgressCallback &progress)
-            : F(F), progress(progress) { }
+        FaceCallbackData(const ProgressCallback &progress)
+            : progress(progress) { }
     };
 
     struct VertexNormalCallbackData {
@@ -141,23 +143,46 @@ void load_ply(const std::string &filename, MatrixXu &F, MatrixXf &V,
         long length, value_index, index;
         ply_get_argument_property(argument, nullptr, &length, &value_index);
 
-        if (length != 3)
-            throw std::runtime_error("Only triangle faces are supported!");
+        if (length < 3)
+            throw std::runtime_error("Faces must have at least 3 vertices!");
 
         ply_get_argument_user_data(argument, (void **) &data, nullptr);
         ply_get_argument_element(argument, nullptr, &index);
 
-        if (value_index >= 0)
-            data->F(value_index, index) = (uint32_t) ply_get_argument_value(argument);
+        if (value_index == 0)
+            data->faceVerts.clear();
+
+        if (value_index >= 0) {
+            data->faceVerts.push_back((uint32_t) ply_get_argument_value(argument));
+
+            if (value_index == length - 1) {
+                if (length == 3) {
+                    data->triangles.emplace_back(
+                        data->faceVerts[0], data->faceVerts[1], data->faceVerts[2]);
+                } else if (length == 4) {
+                    /* Quad → two triangles (same split as OBJ loader) */
+                    data->triangles.emplace_back(
+                        data->faceVerts[0], data->faceVerts[1], data->faceVerts[2]);
+                    data->triangles.emplace_back(
+                        data->faceVerts[0], data->faceVerts[2], data->faceVerts[3]);
+                } else {
+                    /* n-gon fan triangulation from the first vertex */
+                    for (long i = 1; i < length - 1; ++i) {
+                        data->triangles.emplace_back(
+                            data->faceVerts[0], data->faceVerts[i], data->faceVerts[i + 1]);
+                    }
+                }
+            }
+        }
 
         if (data->progress && value_index == 0 && index % 500000 == 0)
-            data->progress("Loading face data", index / (Float) data->F.cols());
+            data->progress("Loading face data", index / (Float) std::max(1l, length));
 
         return 1;
     };
 
     VertexCallbackData vcbData(V, progress);
-    FaceCallbackData fcbData(F, progress);
+    FaceCallbackData fcbData(progress);
     VertexNormalCallbackData vncbData(N, progress);
 
     if (!ply_set_read_cb(ply, "vertex", "x", rply_vertex_cb, &vcbData, 0) ||
@@ -188,9 +213,14 @@ void load_ply(const std::string &filename, MatrixXu &F, MatrixXf &V,
     }
 
     ply_close(ply);
+
+    F.resize(3, fcbData.triangles.size());
+    for (size_t i = 0; i < fcbData.triangles.size(); ++i)
+        F.col(i) = fcbData.triangles[i];
+
     cout << "done. (V=" << vertexCount;
     if (faceCount > 0)
-        cout << ", F=" << faceCount;
+        cout << ", F=" << F.cols();
     cout << ", took " << timeString(timer.value()) << ")" << endl;
 }
 
