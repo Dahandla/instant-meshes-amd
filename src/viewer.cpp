@@ -122,6 +122,10 @@ Viewer::Viewer(bool fullscreen, bool deterministic)
         (const char *)shader_flowline_vert,
         (const char *)shader_flowline_frag);
 
+    mAmdGuideShader.init("amd_guide_shader",
+        (const char *)shader_flowline_vert,
+        (const char *)shader_flowline_frag);
+
     mStrokeShader.init("stroke_shader",
         (const char *)shader_flowline_vert,
         (const char *)shader_flowline_frag);
@@ -237,6 +241,8 @@ Viewer::Viewer(bool fullscreen, bool deterministic)
         mOrientationFieldSingSizeSlider->setEnabled(mLayers[OrientationFieldSingularities]->checked());
         mPositionFieldSingSizeSlider->setEnabled(mLayers[PositionFieldSingularities]->checked());
         mFlowLineSlider->setEnabled(mLayers[FlowLines]->checked());
+        if (mAmdGuidesLayer != nullptr)
+            mAmdGuidesLayer->setEnabled(!mAmdGuides.empty());
     };
     new Label(advancedPopup, "Render layers", "sans-bold");
 
@@ -255,6 +261,11 @@ Viewer::Viewer(bool fullscreen, bool deterministic)
     mFlowLineSlider->setId("flowLineSlider");
     mFlowLineSlider->setTooltip("Controls the number of flow lines");
     mFlowLineSlider->setFinalCallback([&](Float value) { traceFlowLines(); });
+
+    mAmdGuidesLayer = new CheckBox(flowLinePanel, "AMD topology guides", layerCB);
+    mAmdGuidesLayer->setTooltip("Guide vectors from AI Mesh Doctor .guides.bin sidecar");
+    mAmdGuidesLayer->setChecked(false);
+    mAmdGuidesLayer->setEnabled(false);
 
     Widget *orientFieldPanel = new Widget(advancedPopup);
     orientFieldPanel->setLayout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 34));
@@ -661,6 +672,7 @@ Viewer::~Viewer() {
     mOrientationSingularityShader.free();
     mPositionSingularityShader.free();
     mFlowLineShader.free();
+    mAmdGuideShader.free();
     mStrokeShader.free();
     mOutputMeshWireframeShader.free();
     mOutputMeshShader.free();
@@ -1701,6 +1713,11 @@ void Viewer::resetState() {
     mOutputMeshLines = 0;
     mFlowLineFaces = 0;
     mStrokeFaces = 0;
+    mAmdGuides.clear();
+    if (mAmdGuidesLayer != nullptr) {
+        mAmdGuidesLayer->setChecked(false);
+        mAmdGuidesLayer->setEnabled(false);
+    }
     mContinueWithPositions = false;
     if (mStrokes.size() > 0)
         mRes.clearConstraints();
@@ -2814,6 +2831,10 @@ void Viewer::drawOverlay() {
         glDisable(GL_BLEND);
     }
 
+    if (mAmdGuidesLayer != nullptr && mAmdGuidesLayer->checked() && !mAmdGuides.empty()) {
+        mAmdGuides.draw(mAmdGuideShader, Eigen::Matrix4f(proj * view * model));
+    }
+
     if (mOrientationComb->pushed())
         message = "Selected tool: Orientation Comb";
     else if (mOrientationAttractor->pushed())
@@ -3208,6 +3229,7 @@ void Viewer::loadInput(std::string filename, Float creaseAngle, Float scale,
     mPointShader44.invalidateAttribs();
     mPointShader24.invalidateAttribs();
     mFlowLineShader.invalidateAttribs();
+    mAmdGuideShader.invalidateAttribs();
     mStrokeShader.invalidateAttribs();
     mOrientationFieldShader.invalidateAttribs();
     mPositionFieldShader.invalidateAttribs();
@@ -3294,6 +3316,24 @@ void Viewer::loadInput(std::string filename, Float creaseAngle, Float scale,
     mCamera.modelZoom = 3.0f / (mMeshStats.mAABB.max - mMeshStats.mAABB.min).cwiseAbs().maxCoeff();
     mProgressWindow->setVisible(false);
     mProcessEvents = true;
+}
+
+void Viewer::loadAmdGuides(const std::string& filename) {
+    Float edgeLength = mMeshStats.mAverageEdgeLength;
+    if (!std::isfinite(edgeLength) || edgeLength <= 0.f)
+        edgeLength = 0.01f;
+
+    if (!mAmdGuides.loadFromFile(filename, edgeLength, mAmdGuideShader)) {
+        new MessageDialog(this, MessageDialog::Type::Warning, "AMD guides",
+                          "Could not load guide file:\n" + filename);
+        return;
+    }
+
+    if (mAmdGuidesLayer != nullptr) {
+        mAmdGuidesLayer->setEnabled(!mAmdGuides.empty());
+        mAmdGuidesLayer->setChecked(!mAmdGuides.empty());
+    }
+    repaint();
 }
 
 void Viewer::shareGLBuffers() {

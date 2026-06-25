@@ -112,6 +112,8 @@ include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/ext/half
   # Resource file
   ${CMAKE_CURRENT_BINARY_DIR}
+  # AMD Instant Core guide loader (Phase 2 visualization)
+  ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
 # Run bin2c on resource files
@@ -169,6 +171,8 @@ add_executable(InstantMeshes MACOSX_BUNDLE
   src/smoothcurve.h src/smoothcurve.cpp
   src/cleanup.h src/cleanup.cpp
   src/dedge.h src/dedge.cpp
+  src/amd/GuideLoader.cpp
+  src/amd_guide_viz.h src/amd_guide_viz.cpp
   ext/rply/rply.c
   ${EXTRA_SOURCE})
 

@@ -19,6 +19,7 @@
 #include "field.h"
 #include "bvh.h"
 #include "meshstats.h"
+#include "amd_guide_viz.h"
 #include <set>
 
 using nanogui::Alignment;
@@ -73,6 +74,8 @@ public:
                    Float creaseAngle = std::numeric_limits<Float>::infinity(),
                    Float scale = -1, int face_count = -1, int vertex_count = -1,
                    int rosy = 4, int posy = 4, int knn_points = 10);
+
+    void loadAmdGuides(const std::string& filename);
 
     void setSymmetry(int rosy, int posy);
     void setExtrinsic(bool extrinsic);
@@ -184,7 +187,7 @@ protected:
     SerializableGLShader mPositionFieldShader;
     SerializableGLShader mPositionSingularityShader;
     SerializableGLShader mOrientationSingularityShader;
-    SerializableGLShader mFlowLineShader, mStrokeShader;
+    SerializableGLShader mFlowLineShader, mStrokeShader, mAmdGuideShader;
     SerializableGLShader mOutputMeshShader;
     SerializableGLShader mOutputMeshWireframeShader;
     bool mNeedsRepaint;
@@ -236,4 +239,6 @@ protected:
     double mOperationStart;
     uint32_t mOutputMeshFaces, mOutputMeshLines;
     uint32_t mFlowLineFaces, mStrokeFaces;
+    AmdGuideViz mAmdGuides;
+    CheckBox *mAmdGuidesLayer;
 };
