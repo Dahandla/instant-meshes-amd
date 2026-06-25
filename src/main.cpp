@@ -14,6 +14,8 @@
 #include "batch.h"
 #include "viewer.h"
 #include "serializer.h"
+#include "amd/BinaryGuideProvider.h"
+#include "amd/apply_guides.h"
 #include <thread>
 #include <cstdlib>
 
@@ -170,6 +172,7 @@ int main(int argc, char **argv) {
         cout << "   -C, --compat              Compatibility mode to load snapshots from old software versions" << endl;
         cout << "   -k, --knn <count>         Point cloud mode: number of adjacent points to consider" << endl;
         cout << "   -G, --guides <path>       AMD guide sidecar from AI Mesh Doctor (.guides.bin)" << endl;
+        cout << "      --guide-energy        Apply guide field as orientation constraints (with -G)" << endl;
         cout << "   -F, --fullscreen          Open a full-screen window" << endl;
         cout << "   -h, --help                Display this message" << endl;
         return -1;
@@ -185,7 +188,7 @@ int main(int argc, char **argv) {
             batch_process(args[0], batchOutput, rosy, posy, scale, face_count,
                           vertex_count, crease_angle, extrinsic,
                           align_to_boundaries, smooth_iter, knn_points,
-                          !dominant, deterministic);
+                          !dominant, deterministic, amdGuidesPath);
             return 0;
         } catch (const std::exception &e) {
             cerr << "Caught runtime error : " << e.what() << endl;

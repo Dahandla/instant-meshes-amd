@@ -21,12 +21,15 @@
 #include "normal.h"
 #include "extract.h"
 #include "bvh.h"
+#include "amd/BinaryGuideProvider.h"
+#include "amd/apply_guides.h"
 
 void batch_process(const std::string &input, const std::string &output,
                    int rosy, int posy, Float scale, int face_count,
                    int vertex_count, Float creaseAngle, bool extrinsic,
                    bool align_to_boundaries, int smooth_iter, int knn_points,
-                   bool pure_quad, bool deterministic) {
+                   bool pure_quad, bool deterministic,
+                   const std::string &guides_path) {
     cout << endl;
     cout << "Running in batch mode:" << endl;
     cout << "   Input file             = " << input << endl;
@@ -155,6 +158,18 @@ void batch_process(const std::string &input, const std::string &output,
             }
         }
         mRes.propagateConstraints(rosy, posy);
+    }
+
+    if (!guides_path.empty()) {
+        amd::BinaryGuideProvider provider;
+        const Float defaultRadius = (Float) std::max(stats.mAverageEdgeLength * 2.5, 1e-3);
+        if (!provider.load(guides_path, defaultRadius))
+            throw std::runtime_error("Could not load AMD guide file: " + guides_path);
+
+        if (align_to_boundaries && !pointcloud)
+            amd::mergeGuidesToHierarchy(mRes, provider, rosy, posy);
+        else
+            amd::applyGuidesToHierarchy(mRes, provider, rosy, posy);
     }
 
     if (bvh) {

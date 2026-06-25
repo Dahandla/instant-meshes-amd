@@ -1714,6 +1714,7 @@ void Viewer::resetState() {
     mFlowLineFaces = 0;
     mStrokeFaces = 0;
     mAmdGuides.clear();
+    mAmdGuideProvider.clear();
     if (mAmdGuidesLayer != nullptr) {
         mAmdGuidesLayer->setChecked(false);
         mAmdGuidesLayer->setEnabled(false);
@@ -2808,7 +2809,10 @@ void Viewer::refreshStrokes() {
             }
         }
     }
-    mRes.propagateConstraints(mOptimizer.rosy(), mOptimizer.posy());
+    if (mAmdGuideProvider.enabled())
+        amd::mergeGuidesToHierarchy(mRes, mAmdGuideProvider, mOptimizer.rosy(), mOptimizer.posy());
+    else
+        mRes.propagateConstraints(mOptimizer.rosy(), mOptimizer.posy());
 }
 
 void Viewer::drawOverlay() {
@@ -3323,9 +3327,17 @@ void Viewer::loadAmdGuides(const std::string& filename) {
     if (!std::isfinite(edgeLength) || edgeLength <= 0.f)
         edgeLength = 0.01f;
 
-    if (!mAmdGuides.loadFromFile(filename, edgeLength, mAmdGuideShader)) {
+    const Float defaultRadius = std::max(edgeLength * 2.5f, 1e-3f);
+    if (!mAmdGuideProvider.load(filename, defaultRadius)) {
         new MessageDialog(this, MessageDialog::Type::Warning, "AMD guides",
                           "Could not load guide file:\n" + filename);
+        return;
+    }
+
+    if (!mAmdGuides.loadFromFile(filename, edgeLength, mAmdGuideShader)) {
+        new MessageDialog(this, MessageDialog::Type::Warning, "AMD guides",
+                          "Could not build guide visualization:\n" + filename);
+        mAmdGuideProvider.clear();
         return;
     }
 
@@ -3333,7 +3345,19 @@ void Viewer::loadAmdGuides(const std::string& filename) {
         mAmdGuidesLayer->setEnabled(!mAmdGuides.empty());
         mAmdGuidesLayer->setChecked(!mAmdGuides.empty());
     }
+
+    applyAmdGuidesToSolver();
     repaint();
+}
+
+void Viewer::applyAmdGuidesToSolver() {
+    if (!mAmdGuideProvider.enabled() || mRes.size() == 0)
+        return;
+
+    if (mStrokes.empty() && !mAlignToBoundariesBox->checked())
+        amd::applyGuidesToHierarchy(mRes, mAmdGuideProvider, mOptimizer.rosy(), mOptimizer.posy());
+    else
+        amd::mergeGuidesToHierarchy(mRes, mAmdGuideProvider, mOptimizer.rosy(), mOptimizer.posy());
 }
 
 void Viewer::shareGLBuffers() {

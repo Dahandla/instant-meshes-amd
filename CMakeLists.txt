@@ -172,6 +172,8 @@ add_executable(InstantMeshes MACOSX_BUNDLE
   src/cleanup.h src/cleanup.cpp
   src/dedge.h src/dedge.cpp
   src/amd/GuideLoader.cpp
+  src/amd/BinaryGuideProvider.cpp
+  src/amd/apply_guides.cpp
   src/amd_guide_viz.h src/amd_guide_viz.cpp
   ext/rply/rply.c
   ${EXTRA_SOURCE})

@@ -20,6 +20,8 @@
 #include "bvh.h"
 #include "meshstats.h"
 #include "amd_guide_viz.h"
+#include "amd/BinaryGuideProvider.h"
+#include "amd/apply_guides.h"
 #include <set>
 
 using nanogui::Alignment;
@@ -76,6 +78,8 @@ public:
                    int rosy = 4, int posy = 4, int knn_points = 10);
 
     void loadAmdGuides(const std::string& filename);
+
+    void applyAmdGuidesToSolver();
 
     void setSymmetry(int rosy, int posy);
     void setExtrinsic(bool extrinsic);
@@ -240,5 +244,6 @@ protected:
     uint32_t mOutputMeshFaces, mOutputMeshLines;
     uint32_t mFlowLineFaces, mStrokeFaces;
     AmdGuideViz mAmdGuides;
+    amd::BinaryGuideProvider mAmdGuideProvider;
     CheckBox *mAmdGuidesLayer;
 };
